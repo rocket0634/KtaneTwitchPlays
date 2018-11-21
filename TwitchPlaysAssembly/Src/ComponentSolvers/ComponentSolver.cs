@@ -905,7 +905,7 @@ public abstract class ComponentSolver
 	{
 		List<string> messageParts = new List<string>();
 
-		if (OtherModes.ZenModeOn) componentValue = 0;
+		if (OtherModes.ZenModeOn) componentValue *= Convert.ToInt32(Math.Ceiling(Leaderboard.Instance.EXPMultiplier(userNickName)));
 		if (userNickName == null)
 			TwitchPlaySettings.AddRewardBonus(componentValue);
 		else
@@ -997,6 +997,9 @@ public abstract class ComponentSolver
 		if (OtherModes.TimeModeOn && Module.Bomb.bombSolvedModules < Module.Bomb.bombSolvableModules)
 		{
 			float time = OtherModes.GetAdjustedMultiplier() * componentValue;
+			float bonusTime = Leaderboard.Instance.WizardTimeBonus(userNickName, componentValue);
+			time += bonusTime;
+			
 			if (time < TwitchPlaySettings.data.TimeModeMinimumTimeGained)
 			{
 				Module.Bomb.Bomb.GetTimer().TimeRemaining = Module.Bomb.CurrentTimer + TwitchPlaySettings.data.TimeModeMinimumTimeGained;
@@ -1007,7 +1010,22 @@ public abstract class ComponentSolver
 				Module.Bomb.Bomb.GetTimer().TimeRemaining = Module.Bomb.CurrentTimer + time;
 				messageParts.Add($"Bomb time increased by {Math.Round(time, 1)} seconds!");
 			}
-			OtherModes.SetMultiplier(OtherModes.GetMultiplier() + TwitchPlaySettings.data.TimeModeSolveBonus);
+			float extraTimeBonus = Leaderboard.Instance.GetClericMultiBoost(userNickName);
+			OtherModes.SetMultiplier(OtherModes.GetMultiplier() + (TwitchPlaySettings.data.TimeModeSolveBonus * extraTimeBonus));
+		}
+		else
+		{
+			int bonusTime = Leaderboard.Instance.GetClericTimeBoost(userNickName);
+			if (bonusTime > 0)
+			{
+				Module.Bomb.Bomb.GetTimer().TimeRemaining = Module.Bomb.CurrentTimer + bonusTime;
+				IRCConnection.SendMessage($"Bomb time increased due to Cleric solve. ({userNickName} - {bonusTime} seconds)");
+			}
+			float freezeTime = Leaderboard.Instance.WizardFreezeTimeBonus(userNickName, componentValue);
+			if (freezeTime != 0)
+			{
+				TimeDelay(freezeTime);
+			}
 		}
 
 		IRCConnection.SendMessage(messageParts.Join());
@@ -1026,10 +1044,10 @@ public abstract class ComponentSolver
 		List<string> messageParts = new List<string>();
 
 		string headerText = UnsupportedModule ? ModInfo.moduleDisplayName : Module.BombComponent.GetModuleDisplayName();
-		int strikePenalty = -TwitchPlaySettings.data.StrikePenalty * (TwitchPlaySettings.data.EnableRewardMultipleStrikes ? strikeCount : 1);
+		int strikePenalty = ModInfo.strikePenalty * (TwitchPlaySettings.data.EnableRewardMultipleStrikes ? strikeCount : 1);
 		int hpPenalty = 0;
 		OtherModes.Team? team = null;
-		if (OtherModes.ZenModeOn) strikePenalty = 0;
+		if (OtherModes.ZenModeOn) strikePenalty = (int) (strikePenalty * 0.20f);
 		if (OtherModes.VSModeOn)
 		{
 			if (!string.IsNullOrEmpty(userNickName))
@@ -1099,6 +1117,7 @@ public abstract class ComponentSolver
 		if (OtherModes.TimeModeOn)
 		{
 			float originalMultiplier = OtherModes.GetAdjustedMultiplier();
+			float drop = Leaderboard.Instance.GetStrikeMultiMulti(userNickName);
 			bool multiDropped = OtherModes.DropMultiplier();
 			float multiplier = OtherModes.GetAdjustedMultiplier();
 			string tempMessage;
@@ -1150,6 +1169,34 @@ public abstract class ComponentSolver
 			AbandonModule?.Add(module);
 	}
 	#endregion
+
+
+
+	public IEnumerator TimeDelay(float timefreeze)
+	{
+		IRCConnection.SendMessage("TEST STALL 3");
+		timefreeze *= 10;
+		if (OtherModes.StallingTime)
+			IRCConnection.SendMessage("TEST STALL 2");
+		OtherModes.TimeStall += timefreeze;
+		if (!OtherModes.StallingTime)
+		{
+			IRCConnection.SendMessage("TEST STALL 1");
+			OtherModes.StallingTime = true;
+
+			{
+				var timerComponent = Module.Bomb.Bomb.GetTimer();
+				OtherModes.StoredTimeRate = timerComponent.GetRate();
+				timerComponent.SetRateModifier(0);
+				for (OtherModes.TimeStall += timefreeze; OtherModes.TimeStall < 0; OtherModes.TimeStall += Time.deltaTime)
+				{
+					yield return null;
+				}
+				OtherModes.StallingTime = false;
+				timerComponent.SetRateModifier(OtherModes.StoredTimeRate);
+			}
+		}
+	}
 
 	public string Code
 	{

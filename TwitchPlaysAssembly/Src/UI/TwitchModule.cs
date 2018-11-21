@@ -75,6 +75,7 @@ public class TwitchModule : MonoBehaviour
 	public bool IsMod => BombComponent is ModBombComponent || BombComponent is ModNeedyComponent;
 
 	public static bool ClaimsEnabled = true;
+	public static bool Fool = false;
 
 	private string _headerText;
 	public string HeaderText
@@ -447,6 +448,13 @@ public class TwitchModule : MonoBehaviour
 
 	public ClaimResult TryClaim(string userNickName, bool viewRequested = false, bool viewPinRequested = false)
 	{
+		if (Leaderboard.Instance.NoClaims(userNickName) && !Fool)
+		{
+			return new ClaimResult(false, $"@Sorry {userNickName}, your class is not allowed to claim specific or all modules.");
+		}
+
+		Fool = false;
+
 		if (Solver.AttemptedForcedSolve)
 			return new ClaimResult(false, $"@{userNickName}, module {Code} ({HeaderText}) is being solved automatically.");
 

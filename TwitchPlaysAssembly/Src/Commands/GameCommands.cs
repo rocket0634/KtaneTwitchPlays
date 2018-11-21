@@ -66,6 +66,68 @@ static class GameCommands
 			yield return e.Current;
 	}
 
+	[Command(@"cast +(.+)")]
+	public static void CastingSpell([Group(1)] string spell, string user, bool isWhisper)
+	{
+		var curBomb = TwitchGame.Instance.Bombs;
+		float currentMultiplier = OtherModes.GetMultiplier();
+		var spells = new[] { "heal", "healmore", "omniheal", "chaosorb" };
+		var i = Array.IndexOf(spells, spell);
+		if (i == -1)
+		{
+			IRCConnection.SendMessage("This command is not valid.");
+			return;
+		}
+		bool manipulate = new[] { Leaderboard.Instance.CheckHeal(user, 3), Leaderboard.Instance.CheckHeal(user, 6), Leaderboard.Instance.CheckHeal(user, 9), Leaderboard.Instance.CheckChaos(user) }[i];
+		if (manipulate)
+		{
+			spells = new[] { "Heal", "Heal more", "Omni Heal", "Chaos Orb" };
+			var times = new[] { 60f, 150f, 150f };
+			var rewards = new[] { 2.0f, 4.5f, 4.5f };
+			var strikes = new[] { 1, 2, 3 };
+			IRCConnection.SendMessageFormat("{0} has cast the spell of {1}.", user, spells[i]);
+			if (i < 3)
+			{
+				//For compatibility's sake. Eventually make Zen mode incompatible as there's no point with RPG
+				if (i < 2) curBomb[TwitchGame.Instance._currentBomb].CurrentTimer += !OtherModes.ZenModeOn ? times[i] : -times[i];
+				else
+					foreach (TwitchBomb bomb in curBomb.Where(x => GameRoom.Instance.IsCurrentBomb(x.BombID)))
+						bomb.CurrentTimer += !OtherModes.ZenModeOn ? times[i] : -times[i];
+				if (OtherModes.TimeModeOn)
+				{
+					//eventually handle case for all bombs, but currently there's only one global multiplier
+					OtherModes.SetMultiplier(currentMultiplier + rewards[i]);
+					IRCConnection.SendMessageFormat("The multiplier has increased by {0}.", rewards[i]);
+				}
+				else if (!OtherModes.ZenModeOn && !OtherModes.VSModeOn)
+				{
+					if (i < 2) curBomb[TwitchGame.Instance._currentBomb].StrikeCount -= strikes[i];
+					else
+						foreach (TwitchBomb bomb in curBomb.Where(x => GameRoom.Instance.IsCurrentBomb(x.BombID)))
+							bomb.StrikeCount -= strikes[i];
+				}
+				Leaderboard.Instance.SpellCast(user);
+			}
+			else
+			{
+				System.Random rnd = new System.Random();
+				if (OtherModes.TimeModeOn)
+				{
+					float select = rnd.Next(10, 101) / 10f;
+					OtherModes.SetMultiplier(select);
+					IRCConnection.SendMessageFormat("The multiplier has been randomized to {0}.", select);
+				}
+				else if (!OtherModes.ZenModeOn && !OtherModes.VSModeOn)
+				{
+					float mult = rnd.Next(25, 201);
+					curBomb = curBomb.Where(x => GameRoom.Instance.IsCurrentBomb(x.BombID)).ToList();
+					var j = UnityEngine.Random.Range(0, curBomb.Count);
+					curBomb[j].Bomb.GetTimer().TimeRemaining *= mult / 100;
+				}
+			}
+		}
+	}
+
 	[Command(@"claims +(.+)")]
 	public static void ShowClaimsOfAnotherPlayer([Group(1)] string targetUser, string user, bool isWhisper)
 	{
@@ -119,7 +181,10 @@ static class GameCommands
 			.FirstOrDefault();
 
 		if (unclaimed != null)
+		{
+			if (Leaderboard.Instance.NoClaims(user)) TwitchModule.Fool = true;
 			ClaimViewPin(user, isWhisper, new[] { unclaimed }, claim: true, view: view);
+		}
 		else
 			IRCConnection.SendMessage($"There are no more unclaimed{(vanilla ? " vanilla" : modded ? " modded" : null)} modules.");
 	}
@@ -127,6 +192,11 @@ static class GameCommands
 	[Command(@"(?:unclaim|release) *(?:all|(q(?:ueued?)?))")]
 	public static void UnclaimAll(string user, [Group(1)] bool queuedOnly)
 	{
+		if (Leaderboard.Instance.NoClaims(user))
+		{
+			IRCConnection.SendMessageFormat("@{0}, your class is not allowed to unclaim modules.", user);
+			return;
+		}
 		foreach (var module in TwitchGame.Instance.Modules)
 		{
 			module.RemoveFromClaimQueue(user);
@@ -139,6 +209,11 @@ static class GameCommands
 	[Command(@"(?:unclaim|release) +(.+)")]
 	public static void UnclaimSpecific([Group(1)] string unclaimWhat, string user, bool isWhisper)
 	{
+		if (Leaderboard.Instance.NoClaims(user))
+		{
+			IRCConnection.SendMessageFormat("@{0}, your class is not allowed to unclaim modules.", user);
+			return;
+		}
 		var strings = unclaimWhat.SplitFull(' ', ',', ';');
 		var modules = strings.Length == 0 ? null : TwitchGame.Instance.Modules.Where(md => !md.Solved && md.PlayerName == user && strings.Any(str => str.EqualsIgnoreCase(md.Code))).ToArray();
 		if (modules == null || modules.Length == 0)
@@ -575,6 +650,12 @@ static class GameCommands
 	#region Private methods
 	private static void ClaimViewPin(string user, bool isWhisper, IEnumerable<TwitchModule> modules, bool claim = false, bool view = false, bool pin = false)
 	{
+		if (Leaderboard.Instance.NoClaims(user) && !TwitchModule.Fool)
+		{
+			IRCConnection.SendMessage($"Sorry {user}, your class is not allowed to claim specific or all modules.");
+			return;
+		}
+
 		if (isWhisper)
 		{
 			IRCConnection.SendMessage($"{user}, claiming modules is not allowed in whispers.", user, false);

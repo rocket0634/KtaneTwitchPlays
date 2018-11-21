@@ -45,8 +45,15 @@ public static class OtherModes
 	public static float timedMultiplier = 9;
 	public static int goodHealth = 0;
 	public static int evilHealth = 0;
+    public static int teamHealth = 0;
+    public static int bossHealth = 0;
+	public static float TimeStall = 0;
+	public static bool StallingTime = false;
+	public static float StoredTimeRate = 0;
 
 	public static int GetGoodHealth() => goodHealth;
+	
+	public static int GetTeamHealth() => teamHealth;
 
 	public static int GetEvilHealth() => evilHealth;
 
@@ -71,9 +78,9 @@ public static class OtherModes
 		IRCConnection.SendMessageFormat("Mode is now set to: {0}", Enum.GetName(typeof(TwitchPlaysMode), currentMode));
 	}
 
-	public static float GetMultiplier() => timedMultiplier;
+    public static float GetMultiplier() => timedMultiplier;
 
-	public static float GetAdjustedMultiplier() => Math.Min(timedMultiplier, TwitchPlaySettings.data.TimeModeMaxMultiplier);
+	public static float GetAdjustedMultiplier() =>  (float)Math.Round(Math.Min(timedMultiplier, TwitchPlaySettings.data.TimeModeMaxMultiplier),1);
 
 	public static bool DropMultiplier()
 	{
@@ -89,5 +96,5 @@ public static class OtherModes
 		}
 	}
 
-	public static void SetMultiplier(float newMultiplier) => timedMultiplier = newMultiplier;
+    public static void SetMultiplier(float newMultiplier) => timedMultiplier = newMultiplier;
 }

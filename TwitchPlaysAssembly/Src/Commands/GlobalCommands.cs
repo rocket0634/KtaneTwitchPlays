@@ -38,7 +38,7 @@ static class GlobalCommands
 	public static void BonusSolves([Group(1)] string targetPlayer, [Group(2)] int bonus, string user)
 	{
 		IRCConnection.SendMessageFormat(TwitchPlaySettings.data.GiveBonusSolves, targetPlayer, bonus, user);
-		Leaderboard.Instance.AddSolve(targetPlayer, new Color(.31f, .31f, .31f), bonus);
+		Leaderboard.Instance.AddSolves(targetPlayer, new Color(.31f, .31f, .31f), bonus);
 	}
 
 	[Command(@"bonusstrikes? (\S+) (-?[0-9]+)", AccessLevel.SuperUser, AccessLevel.SuperUser)]
@@ -118,6 +118,48 @@ static class GlobalCommands
 
 	[Command(@"rank (?!\d+$)(.*)")]
 	public static void RankByUser([Group(1)] string desiredUser, string user, bool isWhisper) { Leaderboard.Instance.GetRank(desiredUser, out var entry); ShowRank(entry, desiredUser, user, isWhisper); }
+
+	[Command(@"status")]
+	public static void ShowRPGStatus(string user) => Leaderboard.Instance.GetStatus(user);
+
+	[Command(@"levelup +(.+)")]
+	public static void LevelUp([Group(1)] string targetClass, string user) => Leaderboard.Instance.LevelUp(user, targetClass.ToLowerInvariant());
+
+	[Command(@"class2 +(.+)")]
+	public static void SecondClass([Group(1)] string targetClass, string user) => Leaderboard.Instance.SecondaryClass(user, targetClass.ToLowerInvariant());
+
+	[Command(@"shop")]
+	public static void Shop()
+	{
+		IRCConnection.SendMessage("Sorry, the shop is not implemented yet. However, you can buy a potion if you like using !buy potion");
+	}
+
+	[Command(@"buy (\d{1,2} )?(.+)")]
+	public static void Buy([Group(2)] string item, KMGameInfo.State currentState, string user, [Group(1)] int count = 1)
+	{
+		var target = Regex.Replace(item.ToLowerInvariant(), "(es|s)$", "");
+		if (currentState != KMGameInfo.State.Setup) IRCConnection.SendMessage("Sorry, the shop is closed unless you are on the main screen.");
+		else
+		{
+			var available = new[] { "potion" };
+			var prices = new[] { 20 };
+			var i = Array.IndexOf(available, target);
+			if (i == -1)
+			{
+				IRCConnection.SendMessage("Sorry, we don't have that item for sale.");
+				return;
+			}
+			for (int j = 0; j < count; j++)
+			{
+				if (!Leaderboard.Instance.CheckFunds(user, prices[i]))
+				{
+					IRCConnection.SendMessage("Sorry, looks like you can't afford that.");
+					return;
+				}
+			}
+			IRCConnection.SendMessageFormat("Thank you for your patronage! {0} {1} {2} added to your inventory.", count, item, count == 1 ? "was" : "were");
+		}
+	}
 
 	[Command(@"(log|analysis)")]
 	public static void Log() => LogUploader.Instance.PostToChat(LogUploader.Instance.previousUrl, "Analysis for the previous bomb: {0}");
@@ -209,6 +251,11 @@ static class GlobalCommands
 					case "pinallowed":
 					case "pin allowed":
 						IRCConnection.SendMessage($"Module {moduleName} pinning always allowed: {(modules[0].CameraPinningAlwaysAllowed ? "Yes" : "No")}", user, !isWhisper);
+						break;
+					case "strike":
+					case "strikepenalty":
+					case "strike penalty":
+						IRCConnection.SendMessage($"Module {moduleName} strike penalty: {modules[0].strikePenalty}", user, !isWhisper);
 						break;
 					case "color":
 					case "colour":
@@ -376,6 +423,12 @@ static class GlobalCommands
 								break;
 						}
 						IRCConnection.SendMessage($"Module {moduleName} Module pinning always allowed changed to: {(modules[0].CameraPinningAlwaysAllowed ? "Yes" : "No")}", user, !isWhisper);
+						break;
+					case "strike":
+					case "strikepenalty":
+					case "strike penalty":
+						module.strikePenalty = !int.TryParse(changeTo, out int strikePenalty) ? defaultModule.strikePenalty : -strikePenalty;
+						IRCConnection.SendMessage($"Module {moduleName} Strike Penalty changed to: {modules[0].strikePenalty}", user, !isWhisper);
 						break;
 					case "color":
 					case "colour":
@@ -564,6 +617,13 @@ static class GlobalCommands
 	{
 		foreach (string person in targetUsers.Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
 			IRCConnection.SendMessage(string.Format("User {0} access level: {1}", person, UserAccess.LevelToString(UserAccess.HighestAccessLevel(person))), user, !isWhisper);
+	}
+
+	[Command(@"fight")]
+	public static void Fight()
+	{
+		//Eventually to only apply to RPG Mode
+		RunHelp();
 	}
 
 	[Command(@"run")]

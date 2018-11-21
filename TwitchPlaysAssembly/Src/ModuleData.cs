@@ -11,6 +11,10 @@ public class ModuleInformation
 
 	public bool moduleScoreOverride;
 	public float moduleScore = 5;
+	//strikePenalty is depreciated here, but because RPG mode works differently than other modes,
+	//it may be worth reimplementing module-specific penalties.
+	public bool strikePenaltyOverride;
+	public int strikePenalty = -6;
 	public bool moduleScoreIsDynamic;
 	public bool announceModule;
 
