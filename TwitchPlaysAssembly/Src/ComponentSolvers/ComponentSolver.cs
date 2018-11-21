@@ -201,7 +201,7 @@ public abstract class ComponentSolver
 				{
 					if (TwitchPlaySettings.data.UnsubmittablePenaltyPercent <= 0) continue;
 
-					int penalty = Math.Max((int) (modInfo.moduleScore * TwitchPlaySettings.data.UnsubmittablePenaltyPercent), 1);
+					int penalty = Math.Max((int)(modInfo.moduleScore * TwitchPlaySettings.data.UnsubmittablePenaltyPercent), 1);
 					Leaderboard.Instance.AddScore(_currentUserNickName, -penalty);
 					IRCConnection.Instance.SendMessage(TwitchPlaySettings.data.UnsubmittableAnswerPenalty, _currentUserNickName, "!" + ComponentHandle.IDTextMultiDecker.text, modInfo.moduleDisplayName, penalty, penalty > 1 ? "s" : "");
 				}
@@ -218,7 +218,7 @@ public abstract class ComponentSolver
 						if (!string.IsNullOrEmpty(match.Groups[1].Value))
 							IRCConnection.Instance.SendMessage($"Sorry @{userNickName}, {match.Groups[1].Value.Trim()}");
 						break;
-					}						
+					}
 				}
 				else if (currentString.RegexMatch(out match, "^trycancelsequence((?: (?:.|\\n)+)?)$"))
 				{
@@ -462,8 +462,8 @@ public abstract class ComponentSolver
 			return true;
 		}
 
-		if (!message.RegexMatch(out  match, @"^(sendtochat|sendtochaterror|strikemessage) +(\S(?:\S|\s)*)$")) return false;
-		
+		if (!message.RegexMatch(out match, @"^(sendtochat|sendtochaterror|strikemessage) +(\S(?:\S|\s)*)$")) return false;
+
 		var chatMsg = string.Format(match.Groups[2].Value, userNickName, ComponentHandle.Code);
 
 		switch (match.Groups[1].Value)
@@ -539,7 +539,7 @@ public abstract class ComponentSolver
 	{
 		IRCConnection.Instance.SendMessage("{0}{1}", reason, removeSolveBasedModules ? " Some other modules may also be solved to prevent problems." : "");
 		SolveSilently();
-		if(removeSolveBasedModules)
+		if (removeSolveBasedModules)
 			TwitchComponentHandle.RemoveSolveBasedModules();
 	}
 	#endregion
@@ -568,7 +568,7 @@ public abstract class ComponentSolver
 				switch (modInfo.moduleScore)
 				{
 					case 0:
-						moduleScore = (int) (BombCommander.bombSolvableModules * TwitchPlaySettings.data.DynamicScorePercentage);
+						moduleScore = (int)(BombCommander.bombSolvableModules * TwitchPlaySettings.data.DynamicScorePercentage);
 						break;
 					default:
 						moduleScore = 5;
@@ -825,7 +825,8 @@ public abstract class ComponentSolver
 
 	private void AwardSolve(string userNickName, int ComponentValue)
 	{
-		if (OtherModes.ZenModeOn) ComponentValue = (int) Math.Ceiling(ComponentValue * 0.20f);
+		if (OtherModes.ZenModeOn) ComponentValue = (int)Math.Ceiling(ComponentValue * 0.20f);
+		ComponentValue *= Convert.ToInt32(Math.Ceiling(Leaderboard.Instance.EXPMultiplier(userNickName)));
 		if (userNickName == null)
 		{
 			TwitchPlaySettings.AddRewardBonus(ComponentValue);
@@ -835,7 +836,7 @@ public abstract class ComponentSolver
 			string headerText = UnsupportedModule ? modInfo.moduleDisplayName : BombComponent.GetModuleDisplayName();
 			IRCConnection.Instance.SendMessage(TwitchPlaySettings.data.AwardSolve, Code, userNickName, ComponentValue, headerText);
 			string RecordMessageTone = $"Module ID: {Code} | Player: {userNickName} | Module Name: {headerText} | Value: {ComponentValue}";
-			Leaderboard.Instance?.AddSolve(userNickName, 1);
+			Leaderboard.Instance?.AddSolves(userNickName, 1);
 			if (!UserAccess.HasAccess(userNickName, AccessLevel.NoPoints))
 			{
 				Leaderboard.Instance?.AddScore(userNickName, ComponentValue);
@@ -850,6 +851,8 @@ public abstract class ComponentSolver
 		if (OtherModes.TimedModeOn)
 		{
 			float time = OtherModes.GetAdjustedMultiplier() * ComponentValue;
+			float bonusTime = Leaderboard.Instance.WizardTimeBonus(userNickName, ComponentValue);
+			time += bonusTime;
 			if (time < TwitchPlaySettings.data.TimeModeMinimumTimeGained)
 			{
 				BombCommander.timerComponent.TimeRemaining = BombCommander.CurrentTimer + TwitchPlaySettings.data.TimeModeMinimumTimeGained;
@@ -860,7 +863,17 @@ public abstract class ComponentSolver
 				BombCommander.timerComponent.TimeRemaining = BombCommander.CurrentTimer + time;
 				IRCConnection.Instance.SendMessage("Bomb time increased by {0} seconds!", Math.Round(time, 1));
 			}
-			OtherModes.SetMultiplier(OtherModes.GetMultiplier() + TwitchPlaySettings.data.TimeModeSolveBonus);
+			float extraTimeBonus = Leaderboard.Instance.GetClericMultiBoost(userNickName);
+			OtherModes.SetMultiplier(OtherModes.GetMultiplier() + (TwitchPlaySettings.data.TimeModeSolveBonus * extraTimeBonus));
+		}
+		else
+		{
+			int bonusTime = Leaderboard.Instance.GetClericTimeBoost(userNickName);
+			if (bonusTime > 0)
+			{
+				BombCommander.timerComponent.TimeRemaining = BombCommander.CurrentTimer + bonusTime;
+				IRCConnection.Instance.SendMessage("Bomb time increased due to Cleric solve. ({0} - {1} seconds)", userNickName, bonusTime);
+			}
 		}
 	}
 
@@ -868,22 +881,18 @@ public abstract class ComponentSolver
 	{
 		string headerText = UnsupportedModule ? modInfo.moduleDisplayName : BombComponent.GetModuleDisplayName();
 		int strikePenalty = modInfo.strikePenalty * (TwitchPlaySettings.data.EnableRewardMultipleStrikes ? strikeCount : 1);
-		if (OtherModes.ZenModeOn) strikePenalty = (int) (strikePenalty * 0.20f);
+		if (OtherModes.ZenModeOn) strikePenalty = (int)(strikePenalty * 0.20f);
 		IRCConnection.Instance.SendMessage(TwitchPlaySettings.data.AwardStrike, Code, strikeCount == 1 ? "a" : strikeCount.ToString(), strikeCount == 1 ? "" : "s", 0, userNickName, string.IsNullOrEmpty(StrikeMessage) ? "" : " caused by " + StrikeMessage, headerText, strikePenalty);
 		if (strikeCount <= 0) return;
 
 		string RecordMessageTone = $"Module ID: {Code} | Player: {userNickName} | Module Name: {headerText} | Strike";
 		TwitchPlaySettings.AppendToSolveStrikeLog(RecordMessageTone, TwitchPlaySettings.data.EnableRewardMultipleStrikes ? strikeCount : 1);
 
-		int originalReward = TwitchPlaySettings.GetRewardBonus();
-		int currentReward = Convert.ToInt32(originalReward * TwitchPlaySettings.data.AwardDropMultiplierOnStrike);
-		TwitchPlaySettings.SetRewardBonus(currentReward);
-		if (currentReward != originalReward)
-			IRCConnection.Instance.SendMessage($"Reward {(currentReward > 0 ? "reduced" : "increased")} to {currentReward} points.");
 		if (OtherModes.TimedModeOn)
 		{
 			float originalMultiplier = OtherModes.GetAdjustedMultiplier();
-			bool multiDropped = OtherModes.DropMultiplier();
+			float drop = Leaderboard.Instance.GetStrikeMultiMulti(userNickName);
+			bool multiDropped = OtherModes.DropMultiplier(drop);
 			float multiplier = OtherModes.GetAdjustedMultiplier();
 			string tempMessage;
 			if (multiDropped)
@@ -1046,7 +1055,7 @@ public abstract class ComponentSolver
 		else if (inputCommand.Equals("solve") && ((UserAccess.HasAccess(userNickName, AccessLevel.Admin, true) && !UnsupportedModule) ||
 				(UnsupportedModule && GetType() != typeof(UnsupportedModComponentSolver))))
 		{
-	        SolveModule($"A module ({modInfo.moduleDisplayName}) is being automatically solved.", false);
+			SolveModule($"A module ({modInfo.moduleDisplayName}) is being automatically solved.", false);
 			_responded = true;
 		}
 	}

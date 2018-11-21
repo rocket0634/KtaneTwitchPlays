@@ -59,7 +59,7 @@ public abstract class HoldableHandler
 			IRCConnection.Instance.SendMessage($"Reward {(currentReward > 0 ? "reduced" : "increased")} to {currentReward} points.");
 		if (OtherModes.TimedModeOn)
 		{
-			bool multiDropped = OtherModes.DropMultiplier();
+			bool multiDropped = OtherModes.DropMultiplier(1.5f);
 			float multiplier = OtherModes.GetMultiplier();
 			string tempMessage;
 			if (multiDropped)

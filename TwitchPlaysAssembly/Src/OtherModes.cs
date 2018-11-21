@@ -132,14 +132,15 @@ public static class OtherModes
 
 	public static float GetAdjustedMultiplier()
 	{
-		return Math.Min(timedMultiplier, TwitchPlaySettings.data.TimeModeMaxMultiplier);
+		return (float)Math.Round(Math.Min(timedMultiplier, TwitchPlaySettings.data.TimeModeMaxMultiplier),1);
 	}
 
-    public static bool DropMultiplier()
+    public static bool DropMultiplier(float drop)
     {
-        if (timedMultiplier > (TwitchPlaySettings.data.TimeModeMinMultiplier + TwitchPlaySettings.data.TimeModeMultiplierStrikePenalty))
+
+        if (timedMultiplier > (TwitchPlaySettings.data.TimeModeMinMultiplier - drop))
         {
-            timedMultiplier = timedMultiplier - TwitchPlaySettings.data.TimeModeMultiplierStrikePenalty;
+			timedMultiplier = timedMultiplier - drop;
             return true;
         }
         else

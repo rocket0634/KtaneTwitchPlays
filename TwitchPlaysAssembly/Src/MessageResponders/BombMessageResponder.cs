@@ -400,6 +400,58 @@ public class BombMessageResponder : MessageResponder
 				return;
 			}
 
+			if (text.StartsWith("cast",StringComparison.InvariantCultureIgnoreCase))
+			{
+				var split = text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+				bool manipulate;
+				switch (split[1])
+				{
+					case "heal":
+						manipulate = Leaderboard.Instance.CheckHeal(userNickName);
+						if (manipulate)
+						{
+							IRCConnection.Instance.SendMessage("{0} has cast the spell of Heal.", userNickName);
+							IRCConnection.Instance.OnMessageReceived.Invoke("bombbot8885", "#000000", "!bomb add time 60s");
+							if (OtherModes.TimedModeOn) IRCConnection.Instance.OnMessageReceived.Invoke("bombbot8885", "#000000", "!addmultiplier 2.0");
+							if ((!OtherModes.TimedModeOn) && (!OtherModes.ZenModeOn) && (!OtherModes.VsModeOn)) IRCConnection.Instance.OnMessageReceived.Invoke("bombbot8885", "#000000", "!bomb remove strike 1");
+							Leaderboard.Instance.SpellCast(userNickName);
+						}
+						break;
+					case "healmore":
+						manipulate = Leaderboard.Instance.CheckHeal(userNickName);
+						if (manipulate)
+						{
+							IRCConnection.Instance.SendMessage("{0} has cast the spell of Healmore.", userNickName);
+							IRCConnection.Instance.OnMessageReceived.Invoke("bombbot8885", "#000000", "!bomb add time 150s");
+							if (OtherModes.TimedModeOn) IRCConnection.Instance.OnMessageReceived.Invoke("bombbot8885", "#000000", "!addmultiplier 4.5");
+							if ((!OtherModes.TimedModeOn) && (!OtherModes.ZenModeOn) && (!OtherModes.VsModeOn)) IRCConnection.Instance.OnMessageReceived.Invoke("bombbot8885", "#000000", "!bomb remove strike 2");
+							Leaderboard.Instance.SpellCast(userNickName);
+						}
+						break;
+					case "chaosorb":
+						manipulate = Leaderboard.Instance.CheckChaos(userNickName);
+						if (manipulate)
+						{
+							IRCConnection.Instance.SendMessage("{0} has cast the spell of Choas Orb.", userNickName);
+							System.Random rnd = new System.Random();
+							if (OtherModes.TimedModeOn)
+							{
+								string temp = Convert.ToString(rnd.Next(10, 101) / 10);
+								temp = "!setmultiplier " + temp;
+								IRCConnection.Instance.OnMessageReceived.Invoke("bombbot8885", "#000000", temp);
+							}
+							if ((!OtherModes.TimedModeOn) && (!OtherModes.ZenModeOn) && (!OtherModes.VsModeOn))
+							{
+								IRCConnection.Instance.OnMessageReceived.Invoke("bombbot8885", "#000000", "!shifttime");
+							}
+						}
+						break;
+					default:
+						IRCConnection.Instance.SendMessage("This command is not valid.");
+						break;
+				}
+			}
+
 			if (text.Equals("modules", StringComparison.InvariantCultureIgnoreCase))
 			{
 				moduleCameras?.AttachToModules(ComponentHandles);
@@ -429,6 +481,7 @@ public class BombMessageResponder : MessageResponder
 
 			if (text.StartsWith("claim ", StringComparison.InvariantCultureIgnoreCase))
 			{
+				if (Leaderboard.Instance.NoClaims(userNickName)) 	return;
 				var split = text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
 				foreach (var claim in split.Skip(1))
 				{
@@ -441,6 +494,7 @@ public class BombMessageResponder : MessageResponder
 
 			if (text.RegexMatch("^claim ?all$"))
 			{
+				if (Leaderboard.Instance.NoClaims(userNickName)) return;
 				foreach (var handle in ComponentHandles)
 				{
 					if (handle == null || !GameRoom.Instance.IsCurrentBomb(handle.bombID)) continue;
@@ -451,6 +505,7 @@ public class BombMessageResponder : MessageResponder
 
 			if (text.RegexMatch("^(unclaim|release) ?all$"))
 			{
+				if (Leaderboard.Instance.NoClaims(userNickName)) return;
 				foreach (TwitchComponentHandle handle in ComponentHandles)
 				{
 					handle.RemoveFromClaimQueue(userNickName);
@@ -462,6 +517,7 @@ public class BombMessageResponder : MessageResponder
 
 			if (text.RegexMatch(out match, "^(?:unclaim|release) (.+)"))
 			{
+				if (Leaderboard.Instance.NoClaims(userNickName)) return;
 				var split = match.Groups[1].Value.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
 				foreach (var claim in split)
 				{
@@ -552,13 +608,19 @@ public class BombMessageResponder : MessageResponder
 					.FirstOrDefault();
 
 				if (unclaimed != null)
-					text = unclaimed.Code + (view ? " claimview" : " claim");
+				{
+					string temp = "!" + unclaimed.Code + " assign " + userNickName;
+					string temp2 = "!" + unclaimed.Code + " view";
+					IRCConnection.Instance.OnMessageReceived.Invoke("bombbot8885", "#000000", temp2);
+					IRCConnection.Instance.OnMessageReceived.Invoke("bombbot8885", "#000000", temp);
+				}
 				else
 					IRCConnection.Instance.SendMessage(string.Format("There are no more unclaimed{0} modules.", vanilla ? " vanilla" : modded ? " modded" : null));
 			}
 
 			if (text.RegexMatch(out match, "^(?:findclaim|searchclaim|claimsearch|claimfind) (.+)"))
 			{
+				if (Leaderboard.Instance.NoClaims(userNickName)) return;
 				string[] queries = match.Groups[1].Value.Split(new[] { ";" }, StringSplitOptions.RemoveEmptyEntries);
 
 				foreach (string query in queries)
@@ -583,6 +645,7 @@ public class BombMessageResponder : MessageResponder
 
 			if (text.RegexMatch(out match, "^(?:findclaimview|viewfindclaim|claimfindview|claimviewfind|searchclaimview|claimsearchview|viewsearchclaim|viewclaimsearch) (.+)"))
 			{
+				if (Leaderboard.Instance.NoClaims(userNickName)) return;
 				string[] queries = match.Groups[1].Value.Split(new[] { ";" }, StringSplitOptions.RemoveEmptyEntries);
 
 				foreach (string query in queries)
@@ -605,7 +668,6 @@ public class BombMessageResponder : MessageResponder
 				}
 				return;
 			}
-
 			if (text.Equals("newbomb", StringComparison.InvariantCultureIgnoreCase) && OtherModes.ZenModeOn)
 			{
 				foreach (var handle in ComponentHandles.Where(x => GameRoom.Instance.IsCurrentBomb(x.bombID)))

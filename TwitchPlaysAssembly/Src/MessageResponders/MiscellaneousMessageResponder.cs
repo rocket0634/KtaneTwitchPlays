@@ -77,9 +77,9 @@ public class MiscellaneousMessageResponder : MessageResponder
 			yield return drop.Current;
 	}
 
-	int GetMaximumModules(int maxAllowed=int.MaxValue)
+	int GetMaximumModules(int maxAllowed = int.MaxValue)
 	{
-		return Math.Min(TPElevatorSwitch.IsON ? 54 : GameInfo.GetMaximumBombModules(),maxAllowed);
+		return Math.Min(TPElevatorSwitch.IsON ? 54 : GameInfo.GetMaximumBombModules(), maxAllowed);
 	}
 
 	string ResolveMissionID(string targetID, out string failureMessage)
@@ -121,12 +121,12 @@ public class MiscellaneousMessageResponder : MessageResponder
 		}
 		if (moduleCount > GetMaximumModules())
 		{
-			failureMessage = TPElevatorSwitch.IsON 
+			failureMessage = TPElevatorSwitch.IsON
 				? $"Mission \"{targetID}\" was found, however, this mission has too many modules to use in the elevator."
 				: $"Mission \"{targetID}\" was found, however, a bomb case with at least {moduleCount} is not installed / enabled";
 			return null;
 		}
-		
+
 		return mission.name;
 	}
 
@@ -188,7 +188,7 @@ public class MiscellaneousMessageResponder : MessageResponder
 			{
 				IRCConnection.Instance.SendMessage(TwitchPlaySettings.data.GiveBonusSolves, split[1], split[2], userNickName);
 				Color usedColor = new Color(.31f, .31f, .31f);
-				Leaderboard.Instance.AddSolve(playerrewarded, usedColor, solverewarded);
+				Leaderboard.Instance.AddSolves(playerrewarded, usedColor, solverewarded);
 			}
 			return;
 		}
@@ -346,6 +346,42 @@ public class MiscellaneousMessageResponder : MessageResponder
 					IRCConnection.Instance.SendMessage(TwitchPlaySettings.data.DoYouEvenPlayBro, userNickName);
 				}
 				return;
+			}
+		}
+		else if (text.Equals("status", StringComparison.InvariantCultureIgnoreCase))
+		{
+			Leaderboard.Instance.GetStatus(userNickName);
+		}
+		else if (text.StartsWith("levelup", StringComparison.InvariantCultureIgnoreCase))
+		{
+			Leaderboard.Instance.LevelUp(userNickName, split[1]);
+		}
+		else if (text.StartsWith("class2",StringComparison.InvariantCultureIgnoreCase))
+		{
+			Leaderboard.Instance.SecondaryClass(userNickName, split[1]);
+		}
+		if (text.Equals("shop", StringComparison.InvariantCultureIgnoreCase))
+		{
+			if (CurrentState != KMGameInfo.State.Setup) IRCConnection.Instance.SendMessage("Sorry, the shop is closed unless you are on the main screen.");
+			else IRCConnection.Instance.SendMessage("Buy item with !buy <item>.  Current items for sale:  Potion - 20 gold");
+		}
+		if (text.StartsWith("buy", StringComparison.InvariantCultureIgnoreCase))
+		{
+			if (CurrentState != KMGameInfo.State.Setup) IRCConnection.Instance.SendMessage("Sorry, the shop is closed unless you are on the main screen.");
+			else
+			{
+				switch(split[1])
+				{
+					case "Potion":
+					case "potion":
+						bool okay = Leaderboard.Instance.CheckFunds(userNickName, 20);
+						if (okay) IRCConnection.Instance.SendMessage("Thank you for your patronage!");
+						else IRCConnection.Instance.SendMessage("Sorry, looks like you can't afford that.");
+						break;
+					default:
+						IRCConnection.Instance.SendMessage("Sorry, we don't have that item for sale.");
+						break;
+				}
 			}
 		}
 		else if (text.Equals("log", StringComparison.InvariantCultureIgnoreCase) || text.Equals("analysis", StringComparison.InvariantCultureIgnoreCase))
@@ -520,10 +556,11 @@ public class MiscellaneousMessageResponder : MessageResponder
 			}
 			IRCConnection.Instance.SendMessage(finalmessage);
 		}
-		
+
 		switch (split[0])
 		{
 			case "run":
+			case "fight":
 				if (!((TwitchPlaySettings.data.EnableRunCommand && TwitchPlaySettings.data.EnableTwitchPlaysMode) || UserAccess.HasAccess(userNickName, AccessLevel.Mod, true)))
 				{
 					IRCConnection.Instance.SendMessage(TwitchPlaySettings.data.RunCommandDisabled, userNickName);
@@ -533,8 +570,8 @@ public class MiscellaneousMessageResponder : MessageResponder
 				if (split.Length == 1)
 				{
 					string[] validDistributions = TwitchPlaySettings.data.ModDistributions.Where(x => x.Value.Enabled && !x.Value.Hidden).Select(x => x.Key).ToArray();
-					IRCConnection.Instance.SendMessage(validDistributions.Any() 
-						? $"Usage: !run <module_count> <distribution>. Valid distributions are {validDistributions.Join(", ")}" 
+					IRCConnection.Instance.SendMessage(validDistributions.Any()
+						? $"Usage: !run <module_count> <distribution>. Valid distributions are {validDistributions.Join(", ")}"
 						: "Sorry, !run <module_count> <distribution> has been disabled.");
 					break;
 				}
@@ -549,7 +586,7 @@ public class MiscellaneousMessageResponder : MessageResponder
 					zenModeDistribution.MinModules = 1;
 					zenModeDistribution.MaxModules = GetMaximumModules(18);
 					zenModeDistribution.Hidden = true;
-					
+
 					Array.Resize(ref split, 3);
 					split[2] = "zen";
 				}
@@ -570,9 +607,9 @@ public class MiscellaneousMessageResponder : MessageResponder
 
 					if (missionID == null)
 					{
-						string distributionName = TwitchPlaySettings.data.ModDistributions.Keys.FirstOrDefault(y => int.TryParse(split[1].Replace(y,""),out _));
+						string distributionName = TwitchPlaySettings.data.ModDistributions.Keys.FirstOrDefault(y => int.TryParse(split[1].Replace(y, ""), out _));
 						if (distributionName == null || !int.TryParse(split[1].Replace(distributionName, ""), out int modules) ||
-							modules < TwitchPlaySettings.data.ModDistributions[distributionName].MinModules || 
+							modules < TwitchPlaySettings.data.ModDistributions[distributionName].MinModules ||
 							modules > GetMaximumModules(TwitchPlaySettings.data.ModDistributions[distributionName].MaxModules) ||
 							!(TwitchPlaySettings.data.ModDistributions[distributionName].Enabled && !UserAccess.HasAccess(userNickName, AccessLevel.Mod, true)))
 						{
@@ -589,7 +626,40 @@ public class MiscellaneousMessageResponder : MessageResponder
 					{
 						if (CurrentState == KMGameInfo.State.PostGame) StartCoroutine(ReturnToSetup(userNickName, "!" + text));
 						if (CurrentState != KMGameInfo.State.Setup) break;
+						int rewardPoints;
+						switch (missionID)
+						{
+							case "Bat":
+								rewardPoints = 2;
+								break;
+							case "Wolf":
+								rewardPoints = 3;
+								break;
+							case "Imp":
+								rewardPoints = 4;
+								break;
+							case "Slime":
+								rewardPoints = 1;
+								break;
+							case "Goblin":
+								rewardPoints = 7;
+								break;
+							case "Spider":
+								rewardPoints = 15;
+								break;
+							case "Alpha Wolf":
+								rewardPoints = 10;
+								break;
+							case "Bear":
+								rewardPoints = 12;
+								break;
+							default:
+								rewardPoints = 0;
+								break;
+						}
 
+						TwitchPlaySettings.SetRewardBonus(rewardPoints);
+						IRCConnection.Instance.SendMessage("Reward for completing bomb: " + rewardPoints);
 						GameCommands.StartMission(missionID, "-1");
 					}
 				}
@@ -622,10 +692,10 @@ public class MiscellaneousMessageResponder : MessageResponder
 
 						if (modules < distribution.MinModules && !zen)
 						{
-							IRCConnection.Instance.SendMessage("Sorry, the minimum number of modules for \"{0}\" is {1}.", distribution.DisplayName , distribution.MinModules);
+							IRCConnection.Instance.SendMessage("Sorry, the minimum number of modules for \"{0}\" is {1}.", distribution.DisplayName, distribution.MinModules);
 							break;
 						}
-						
+
 						int maxModules = GetMaximumModules(zen ? GetMaximumModules(18) : distribution.MaxModules);
 						if (modules > maxModules)
 						{
@@ -638,7 +708,7 @@ public class MiscellaneousMessageResponder : MessageResponder
 
 						if (CurrentState == KMGameInfo.State.PostGame) StartCoroutine(ReturnToSetup(userNickName, "!" + text));
 						if (CurrentState != KMGameInfo.State.Setup) break;
-						
+
 						int vanillaModules = Mathf.FloorToInt(modules * distribution.Vanilla);
 						int moddedModules = Mathf.FloorToInt(modules * distribution.Modded);
 
@@ -670,7 +740,7 @@ public class MiscellaneousMessageResponder : MessageResponder
 							KMComponentPool factoryPool = new KMComponentPool
 							{
 								Count = 8,
-								ModTypes = new List<string>(new[] {"Factory Mode"})
+								ModTypes = new List<string>(new[] { "Factory Mode" })
 							};
 
 							pools.Add(factoryPool);
@@ -696,8 +766,8 @@ public class MiscellaneousMessageResponder : MessageResponder
 								NumStrikes = Math.Max(3, modules / 12)
 							};
 						}
-						
-						int rewardPoints = Convert.ToInt32((5 * modules) - (3 * vanillaModules));
+
+						int rewardPoints = Convert.ToInt32(Math.Floor((double)modules/6));
 						TwitchPlaySettings.SetRewardBonus(rewardPoints);
 						IRCConnection.Instance.SendMessage("Reward for completing bomb: " + rewardPoints);
 						GameCommands.StartMission(mission, "-1");
@@ -861,7 +931,7 @@ public class MiscellaneousMessageResponder : MessageResponder
 		{
 			GameRoom.ToggleCamera(true);
 		}
-		
+
 		bool cameraChanged = false;
 		bool cameraChangeAttempted = false;
 		if (text.RegexMatch(out match, "move ?camera ?x (-?[0-9]+(?:\\.[0-9]+)*)"))
@@ -933,7 +1003,7 @@ public class MiscellaneousMessageResponder : MessageResponder
 	{
 		if (!BombMessageResponder.EnableDisableInput()) return;
 
-		if(TwitchComponentHandle.SolveUnsupportedModules(true))
+		if (TwitchComponentHandle.SolveUnsupportedModules(true))
 			IRCConnection.Instance.SendMessage("Some modules were automatically solved to prevent problems with defusing this bomb.");
 
 		if (TwitchComponentHandle.UnsupportedModulesPresent())

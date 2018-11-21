@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using UnityEngine;
 using System.IO;
@@ -76,6 +77,84 @@ public class Leaderboard
 			set;
 		}
 
+		public int Level
+		{
+			get;
+			set;
+		}
+
+		public double EXPToNextLevel
+		{
+			get;
+			set;
+		}
+
+		public int MaxHP
+		{
+			get;
+			set;
+		}
+
+		public int CurrentHP
+		{
+			get;
+			set;
+		}
+
+		public int Gold
+		{
+			get;
+			set;
+		}
+
+		public int Prestige
+		{
+			get;
+			set;
+		}
+
+		public int ClericLV
+		{
+			get;
+			set;
+		}
+
+		public int DefenderLV
+		{
+			get;
+			set;
+		}
+
+		public int TricksterLV
+		{
+			get;
+			set;
+		}
+
+		public int WizardLV
+		{
+			get;
+			set;
+		}
+
+		public string CurrentClass
+		{
+			get;
+			set;
+		}
+
+		public string SecondaryClass
+		{
+			get;
+			set;
+		}
+
+		public DateTime LastUsedSpell
+		{
+			get;
+			set;
+		}
+
 		public float TimePerSoloSolve
 		{
 			get
@@ -84,16 +163,16 @@ public class Leaderboard
 				{
 					return 0;
 				}
-				return ((float) RecordSoloTime) / Leaderboard.RequiredSoloSolves;
+				return ((float)RecordSoloTime) / Leaderboard.RequiredSoloSolves;
 			}
 		}
 
-		public void AddSolve(int num = 1)
+		public void AddSolve(int num)
 		{
 			SolveCount += num;
 		}
 
-		public void AddStrike(int num = 1)
+		public void AddStrike(int num)
 		{
 			StrikeCount += num;
 		}
@@ -103,7 +182,31 @@ public class Leaderboard
 			SolveScore += num;
 		}
 
+		public void AddCoin(int num)
+		{
+			Gold += num;
+		}
+
+		public void AddPrestige(int num)
+		{
+			Prestige += num;
+		}
+
+
 	}
+
+	public bool CheckFunds(string userName, int cost)
+	{
+		LeaderboardEntry entry = GetEntry(userName);
+		if (entry.Gold >= cost)
+		{
+			entry.Gold -= cost;
+			return true;
+		}
+		else
+			return false;
+	}
+
 
 	private Color SafeGetColor(string userName)
 	{
@@ -115,6 +218,106 @@ public class Leaderboard
 		return _entryDictionary.TryGetValue(UserName.ToLowerInvariant(), out entry);
 	}
 
+	public void SecondaryClass(string UserName, string Class2)
+	{
+		LeaderboardEntry entry = GetEntry(UserName);
+		if ((Class2 == "cleric") || (Class2 == "defender") || (Class2 == "wizard") || (Class2 == "trickster"))
+		{
+			TextInfo temp = new CultureInfo("en-US", false).TextInfo;
+			entry.SecondaryClass = Class2;
+			IRCConnection.Instance.SendMessage("Secondary class has been set to {0}", temp.ToTitleCase(Class2));
+		}
+		else
+		{
+			IRCConnection.Instance.SendMessage("Invalid class choice.");
+		}
+
+	}
+
+	public LeaderboardEntry LevelUp(string UserName, string NewClass)
+	{
+		LeaderboardEntry entry = GetEntry(UserName);
+		if (entry.EXPToNextLevel != 0)
+		{
+			IRCConnection.Instance.SendMessage("Sorry, you have insufficient experience to level up currently.");
+		}
+		else
+		{
+
+			switch (NewClass)
+			{
+				case "cleric":
+					if (entry.ClericLV == 5)
+					{
+						IRCConnection.Instance.SendMessage("Sorry, you have maxed out that class.");
+						return entry;
+					}
+					entry.Level += 1;
+					entry.CurrentHP += 3;
+					entry.MaxHP += 3;
+					entry.ClericLV += 1;
+					entry.CurrentClass = "Cleric";
+					IRCConnection.Instance.SendMessage("Congratuations, {0}, you are now a LV {1} Cleric.", UserName, entry.ClericLV);
+					ResetEXPNeeded(UserName);
+					return entry;
+				case "defender":
+					if (entry.DefenderLV == 5)
+					{
+						IRCConnection.Instance.SendMessage("Sorry, you have maxed out that class.");
+						return entry;
+					}
+					entry.Level += 1;
+					entry.CurrentHP += 6;
+					entry.MaxHP += 6;
+					entry.DefenderLV += 1;
+					entry.CurrentClass = "Defender";
+					IRCConnection.Instance.SendMessage("Congratuations, {0}, you are now a LV {1} Defender.", UserName, entry.DefenderLV);
+					ResetEXPNeeded(UserName);
+					return entry;
+				case "trickster":
+					if (entry.TricksterLV == 5)
+					{
+						IRCConnection.Instance.SendMessage("Sorry, you have maxed out that class.");
+						return entry;
+					}
+					entry.Level += 1;
+					System.Random rnd = new System.Random();
+					int temp = rnd.Next(3, 7);
+					entry.CurrentHP += temp;
+					entry.MaxHP += temp;
+					entry.TricksterLV += 1;
+					entry.CurrentClass = "Trickster";
+					IRCConnection.Instance.SendMessage("Congratuations, {0}, you are now a LV {1} Trickster.", UserName, entry.TricksterLV);
+					ResetEXPNeeded(UserName);
+					return entry;
+				case "wizard":
+					if (entry.WizardLV == 5)
+					{
+						IRCConnection.Instance.SendMessage("Sorry, you have maxed out that class.");
+						return entry;
+					}
+					entry.Level += 1;
+					entry.CurrentHP += 4;
+					entry.MaxHP += 4;
+					entry.WizardLV += 1;
+					entry.CurrentClass = "Wizard";
+					IRCConnection.Instance.SendMessage("Congratuations, {0}, you are now a LV {1} Wizard.", UserName, entry.WizardLV);
+					ResetEXPNeeded(UserName);
+					return entry;
+				default:
+					IRCConnection.Instance.SendMessage("Sorry, unable to find a class named {0}", NewClass);
+					return entry;
+			}
+		}
+		return entry;
+	}
+
+	public void ResetEXPNeeded(string userName)
+	{
+		LeaderboardEntry entry = GetEntry(userName);
+		entry.EXPToNextLevel = entry.Level * 250;
+	}
+
 	private LeaderboardEntry GetEntry(string userName)
 	{
 		DebugHelper.Log($"Getting entry for user {userName}");
@@ -124,6 +327,11 @@ public class Leaderboard
 			_entryDictionary[userName.ToLowerInvariant()] = entry;
 			_entryList.Add(entry);
 			entry.UserColor = SafeGetColor(userName);
+			entry.EXPToNextLevel = 100;
+			entry.MaxHP = 5;
+			entry.CurrentHP = 5;
+			entry.CurrentClass = "Human";
+			entry.SecondaryClass = "Human";
 		}
 		entry.UserName = userName;
 		return entry;
@@ -158,21 +366,42 @@ public class Leaderboard
 		return entry;
 	}
 
-	public void AddSolve(string userName, int numSolve)
+	public void AddSolve(string userName)
 	{
-		AddSolve(userName, SafeGetColor(userName), numSolve);
-	}
-	public void AddSolve(string userName, Color userColor, int numSolve)
-	{
-		LeaderboardEntry entry = GetEntry(userName, userColor);
+		LeaderboardEntry entry = GetEntry(userName, SafeGetColor(userName));
 
-		entry.AddSolve(numSolve);
+		entry.AddSolve(1);
 		entry.LastAction = DateTime.Now;
 		ResetSortFlag();
 
 		string name = userName.ToLowerInvariant();
-		CurrentSolvers[name] = CurrentSolvers.TryGetValue(name, out int value) ? value + numSolve : numSolve;
+		CurrentSolvers[name] = CurrentSolvers.TryGetValue(name, out int value) ? value + 1 : 1;
 	}
+
+	public void AddSolves(string userName, int num)
+	{
+		LeaderboardEntry entry = GetEntry(userName, SafeGetColor(userName));
+
+		entry.AddSolve(num);
+		entry.LastAction = DateTime.Now;
+		ResetSortFlag();
+
+		string name = userName.ToLowerInvariant();
+		CurrentSolvers[name] = CurrentSolvers.TryGetValue(name, out int value) ? value + 1 : 1;
+	}
+
+	public void AddSolves(string userName, Color userColor, int num)
+	{
+		LeaderboardEntry entry = GetEntry(userName, userColor);
+
+		entry.AddSolve(num);
+		entry.LastAction = DateTime.Now;
+		ResetSortFlag();
+
+		string name = userName.ToLowerInvariant();
+		CurrentSolvers[name] = CurrentSolvers.TryGetValue(name, out int value) ? value + 1 : 1;
+	}
+
 	public void AddStrike(string userName, int numStrikes)
 	{
 		AddStrike(userName, SafeGetColor(userName), numStrikes);
@@ -192,15 +421,214 @@ public class Leaderboard
 		AddScore(userName, SafeGetColor(userName), numScore);
 	}
 
+	public void AddPP(string userName, int PP)
+	{
+		AddCoin(userName, SafeGetColor(userName), PP);
+		AddPrestige(userName, SafeGetColor(userName), PP);
+	}
+
+	public void AddCoin(string userName, Color userColor, int NumScore)
+	{
+		LeaderboardEntry entry = GetEntry(userName, userColor);
+		entry.AddCoin(NumScore);
+	}
+
+	public void AddPrestige(string userName, Color userColor, int NumScore)
+	{
+		LeaderboardEntry entry = GetEntry(userName, userColor);
+		entry.AddPrestige(NumScore);
+	}
+
 	public void AddScore(string userName, Color userColor, int numScore)
 	{
 		LeaderboardEntry entry = GetEntry(userName, userColor);
 		entry.AddScore(numScore);
+		if (entry.EXPToNextLevel > 0)
+		{
+			double EXPmultiplier = 1.0;
+			if (numScore > 0) entry.EXPToNextLevel -= (numScore * EXPmultiplier);
+			if (entry.EXPToNextLevel <= 0)
+			{
+				IRCConnection.Instance.SendMessage("{0}, you have attained enough experience to gain a level!  Use !levelup <class> to level up, and choose your active class, and/or !class2 <class> to choose your secondary.", userName);
+				entry.EXPToNextLevel = 0;
+			}
+		}
 		entry.LastAction = DateTime.Now;
 		ResetSortFlag();
 	}
 
-	public IEnumerable<LeaderboardEntry> GetSortedEntries(int count)
+	public float GetStrikeMultiMulti(string userName)
+	{
+		float multi = 1.5f;
+		LeaderboardEntry entry = GetEntry(userName);
+		if ((entry.CurrentClass == "Cleric") || (entry.CurrentClass == "cleric"))
+		{
+			multi *= 2;
+		}
+		return multi;
+	}
+
+	public int GetClericTimeBoost(string userName)
+	{
+		LeaderboardEntry entry = GetEntry(userName);
+		if ((entry.CurrentClass == "Cleric") || (entry.CurrentClass == "cleric") || (entry.SecondaryClass == "Cleric") || (entry.SecondaryClass == "cleric"))
+		{
+			switch (entry.ClericLV)
+			{
+				case 0:
+					return 0;
+				case 1:
+					return 10;
+				case 2:
+				case 3:
+					return 20;
+				case 4:
+					return 30;
+				case 5:
+				case 6:
+					return 40;
+			}
+		}
+		return 0;
+	}
+
+	public float GetClericMultiBoost(string userName)
+	{
+		float multi = 1.0f;
+		LeaderboardEntry entry = GetEntry(userName);
+		if ((entry.CurrentClass == "Cleric") || (entry.CurrentClass == "cleric") || (entry.SecondaryClass == "Cleric") || (entry.SecondaryClass == "cleric"))
+		{
+			switch (entry.ClericLV)
+			{
+				case 1:
+					multi = 2.0f;
+					break;
+				case 2:
+				case 3:
+					multi = 3.0f;
+					break;
+				case 4:
+					multi = 4.0f;
+					break;
+				case 5:
+				case 6:
+					multi = 5.0f;
+					break;
+			}
+		}
+		if ((entry.CurrentClass == "Wizard") || (entry.CurrentClass == "wizard")) multi *= .75f;
+		return multi;
+	}
+
+	public float WizardTimeBonus(string userName, int Original)
+	{
+		float bonus = Original;
+		LeaderboardEntry entry = GetEntry(userName);
+		if ((entry.CurrentClass == "Wizard") || (entry.CurrentClass == "wizard") || (entry.SecondaryClass == "Wizard") || (entry.SecondaryClass == "wizard"))
+		{
+			switch (entry.WizardLV)
+			{
+				case 1:
+				case 2:
+					return Original;
+				case 3:
+				case 4:
+					return Original*2;
+				case 5:
+				case 6:
+					return Original * 3;
+				default:
+					return 0;
+			}
+		}
+		return 0;
+	}
+
+	public void SpellCast(string userName)
+	{
+		LeaderboardEntry entry = GetEntry(userName);
+		entry.LastUsedSpell = DateTime.Now;
+	}
+
+	public bool CheckChaos(string userName)
+	{
+		LeaderboardEntry entry = GetEntry(userName);
+		if ((entry.CurrentClass == "Trickster") || (entry.CurrentClass == "trickster") || (entry.SecondaryClass == "Trickster") || (entry.SecondaryClass == "trickster"))
+		{
+			if (entry.TricksterLV < 3)
+			{
+				IRCConnection.Instance.SendMessage("You are not high enough level to cast this spell.");
+				return false;
+			}
+			if ((DateTime.Now - entry.LastUsedSpell).TotalHours > 24)
+			{
+				return true;
+			}
+			IRCConnection.Instance.SendMessage("You cannot cast a spell again this quickly.  You must wait 24 hours between spell casts.");
+
+		}
+		return false;
+	}
+
+	public bool CheckHeal(string userName)
+	{
+		LeaderboardEntry entry = GetEntry(userName);
+		if ((entry.CurrentClass == "Cleric") || (entry.CurrentClass == "cleric") || (entry.SecondaryClass == "Cleric") || (entry.SecondaryClass == "cleric"))
+		{
+			if (entry.ClericLV < 3)
+			{
+				IRCConnection.Instance.SendMessage("You are not high enough level to cast this spell.");
+				return false;
+			}
+			 if ((DateTime.Now - entry.LastUsedSpell).TotalHours > 24)
+			{
+				return true;
+			}
+			IRCConnection.Instance.SendMessage("You cannot cast a spell again this quickly.  You must wait 24 hours between spell casts.");
+
+		}
+		return false;
+	}
+
+	public bool NoClaims(string userName)
+	{
+		LeaderboardEntry entry = GetEntry(userName);
+		if ((entry.CurrentClass == "Trickster") || (entry.CurrentClass == "trickster")) return true;
+		return false;
+	}
+
+	public float EXPMultiplier(string userName)
+	{
+		float multi = 1.0f;
+		LeaderboardEntry entry = GetEntry(userName);
+		if ((entry.CurrentClass == "Trickster") || (entry.CurrentClass == "trickster") || (entry.SecondaryClass == "Trickster") || (entry.SecondaryClass == "trickster"))
+		{
+			switch (entry.TricksterLV)
+			{
+				case 1:
+					multi *= 1.1f;
+					break;
+				case 2:
+				case 3:
+					multi *= 1.2f;
+					break;
+				case 4:
+					multi *= 1.3f;
+					break;
+				case 5:
+					multi *= 1.4f;
+					break;
+				case 6:
+					multi *= 1.5f;
+					break;
+				default:
+					break;
+			}
+		}
+		return multi;
+	}
+
+		public IEnumerable<LeaderboardEntry> GetSortedEntries(int count)
 	{
 		CheckAndSort();
 		return _entryList.Take(count);
@@ -254,6 +682,12 @@ public class Leaderboard
 		return _entryList.IndexOf(entry) + 1;
 	}
 
+	public void GetStatus(string userName)
+	{
+		LeaderboardEntry entry = GetEntry(userName);
+		IRCConnection.Instance.SendMessage("{0} (HP: {11}/{12}) is a Level {1} {2}/{6}, with {3} gold and {4} prestige.  {5} EXP required to level up.  Class levels:  C: {7} D: {8} T: {9} W: {10}", userName, entry.Level, entry.CurrentClass, entry.Gold, entry.Prestige, entry.EXPToNextLevel, entry.SecondaryClass, entry.ClericLV, entry.DefenderLV, entry.TricksterLV, entry.WizardLV, entry.CurrentHP, entry.MaxHP);
+	}
+
 	public int GetRank(int rank, out LeaderboardEntry entry)
 	{
 		CheckAndSort();
@@ -292,6 +726,19 @@ public class Leaderboard
 		entry.RecordSoloTime = user.RecordSoloTime;
 		entry.TotalSoloTime = user.TotalSoloTime;
 		entry.TotalSoloClears = user.TotalSoloClears;
+		entry.Level = user.Level;
+		entry.EXPToNextLevel = user.EXPToNextLevel;
+		entry.MaxHP = user.MaxHP;
+		entry.CurrentHP = user.CurrentHP;
+		entry.Gold = user.Gold;
+		entry.Prestige = user.Prestige;
+		entry.ClericLV = user.ClericLV;
+		entry.DefenderLV = user.DefenderLV;
+		entry.TricksterLV = user.TricksterLV;
+		entry.WizardLV = user.WizardLV;
+		entry.CurrentClass = user.CurrentClass;
+		entry.SecondaryClass = user.SecondaryClass;
+		entry.LastUsedSpell = user.LastUsedSpell;
 
 		if (entry.TotalSoloClears > 0)
 		{
@@ -375,7 +822,7 @@ public class Leaderboard
 			DebugHelper.Log("Leaderboard: Loading leaderboard data from file: {0}", path);
 			XmlSerializer xml = new XmlSerializer(_entryList.GetType());
 			TextReader reader = new StreamReader(path);
-			List<LeaderboardEntry> entries = (List<LeaderboardEntry>) xml.Deserialize(reader);
+			List<LeaderboardEntry> entries = (List<LeaderboardEntry>)xml.Deserialize(reader);
 			AddEntries(entries);
 			ResetSortFlag();
 

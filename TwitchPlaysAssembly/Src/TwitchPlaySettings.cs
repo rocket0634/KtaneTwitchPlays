@@ -518,11 +518,11 @@ public static class TwitchPlaySettings
 		{
 			return data.BombDefusedFooter;
 		}
-		int ClearReward2 = Mathf.CeilToInt(ClearReward / (float) Players.Count);
+		int ClearReward2 = ClearReward;
 		string message = string.Format(data.BombDefusedBonusMessage, ClearReward2) + data.BombDefusedFooter;
 		foreach (string player in Players)
 		{
-			Leaderboard.Instance.AddScore(player, ClearReward2);
+			Leaderboard.Instance.AddPP(player, ClearReward2);
 		}
 		ClearPlayerLog();
 		return message;

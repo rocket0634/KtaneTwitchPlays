@@ -398,7 +398,9 @@ public class TwitchComponentHandle : MonoBehaviour
 
 	public Tuple<bool, string> ClaimModule(string userNickName, string targetModule)
 	{
-		if (Solver.AttemptedForcedSolve)
+		if (Leaderboard.Instance.NoClaims(userNickName)) return new Tuple<bool, string>(false, string.Format("Unable to claim"));
+
+			if (Solver.AttemptedForcedSolve)
 		{
 			return new Tuple<bool, string>(false, string.Format("Sorry, @{1}, module ID {0} ({2}) is being solved automatically.", targetModule, PlayerName, HeaderText));
 		}

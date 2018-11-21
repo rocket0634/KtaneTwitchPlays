@@ -164,6 +164,15 @@ public class TwitchBombHandle : MonoBehaviour
 					bombCommander.StrikeCount, bombCommander.StrikeLimit, bombCommander.bombSolvedModules, bombCommander.bombSolvableModules, currentReward);
 			}
 		}
+		else if (internalCommandLower.Equals("shifttime"))
+		{
+			if (UserAccess.HasAccess(userNickName, AccessLevel.Streamer, true))
+			{
+				System.Random rnd = new System.Random();
+				float mult = rnd.Next(25, 201);
+				bombCommander.timerComponent.TimeRemaining *= (mult / 100);
+			}
+		}
 		else if (split[0].EqualsAny("add", "increase", "change", "subtract", "decrease", "remove", "set"))
 		{
 			if (UserAccess.HasAccess(userNickName, AccessLevel.Admin, true))
